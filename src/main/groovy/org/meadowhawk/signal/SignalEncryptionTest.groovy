@@ -1,3 +1,5 @@
+package org.meadowhawk.signal
+
 import org.whispersystems.libsignal.IdentityKey
 import org.whispersystems.libsignal.IdentityKeyPair
 import org.whispersystems.libsignal.InvalidKeyIdException
