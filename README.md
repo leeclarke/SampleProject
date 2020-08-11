@@ -7,4 +7,4 @@ There are readme docs contined in the vairious src folders related to compleated
 TOC
 ---
 * [Password Based Symmetric File Encryption ](/src/main/groovy/org/meadowhawk/util/crypto/)
-* [Signal Eliptical Curve Test(Tbd)](/src/main/groovy/org/meadowhawk/signal)
+* [Signal Protocol Test(Tbd)](/src/main/groovy/org/meadowhawk/signal)
