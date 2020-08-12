@@ -9,7 +9,7 @@ While I can't simplify encryption much, I hope to make it more approachable to a
 * Sample code can be grabbed [from My GitHub](https://github.com/leeclarke/SampleProject/tree/master/src/main/groovy/org/meadowhawk/util/crypto) 
 * [EncryptionUtil](./EncryptionUtil.groovy) uses a password to create an AES Key for Symmetric encryptionof an InputStream
 * Bouncy Castle was used for Encryption, it works great and easier to work with then the java libs imho.
-* Check out the Spock test to see how to use [EncryptionUtilSpec](/./src/test/groovy/org/meadowhawk/util/crypto/EncryptionUtilSpec.groovyEncryptionUtilSpec.groovy)
+* Check out the Spock test to see how to use [EncryptionUtilSpec](/./src/test/groovy/org/meadowhawk/util/crypto/EncryptionUtilSpec.groovy)
 * Code as is, no warranty, do what ya want with it!
 * Stay encrypted folks!
 
@@ -120,7 +120,7 @@ Not surprisingly, Decrypting the file is pretty much reversing what the encrypti
 
 ## Summary and Tests
 
-To tie this all together, I wrote a Spock test to provide an example and better demonstrate usage, the full test code is in the file [EncryptionUtilSpec](/./src/test/groovy/org/meadowhawk/util/crypto/EncryptionUtilSpec.groovyEncryptionUtilSpec.groovy) but here's the highlights.
+To tie this all together, I wrote a Spock test to provide an example and better demonstrate usage, the full test code is in the file [EncryptionUtilSpec](/./src/test/groovy/org/meadowhawk/util/crypto/EncryptionUtilSpec.groovy) but here's the highlights.
 
 ```
     def "Test encrypting a File" () {
