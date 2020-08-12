@@ -5,8 +5,16 @@ Encryption is a funny thing, it's essential to do and do well , but its complica
 
 While I can't simplify encryption much, I hope to make it more approachable to accomplish the simple task of encrypting a file using a password by walking you though the process. And as usual, when it comes to code, nothing teaches better then well... ```code```.
 
+## The tldr
+* Sample code can be grabbed [from My GitHub](https://github.com/leeclarke/SampleProject/tree/master/src/main/groovy/org/meadowhawk/util/crypto) 
+* [EncryptionUtil](./EncryptionUtil.groovy) uses a password to create an AES Key for Symmetric encryptionof an InputStream
+* Bouncy Castle was used for Encryption, it works great and easier to work with then the java libs imho.
+* Check out the Spock test to see how to use [EncryptionUtilSpec](/./src/test/groovy/org/meadowhawk/util/crypto/EncryptionUtilSpec.groovyEncryptionUtilSpec.groovy)
+* Code as is, no warranty, do what ya want with it!
+* Stay encrypted folks!
+
 ## Turning a Password Into a Key 
-I'll start off with the [EncryptionUtil]() class. Quick note:  This is written in Groovy but for the most part you can add semicolons and rename to groovy. 
+I'll start off with the [EncryptionUtil](./EncryptionUtil.groovy) class. Quick note:  This is written in Groovy but for the most part you can add semicolons and rename to groovy. 
 
 
 ### Create a key from your password
@@ -44,4 +52,116 @@ Other things to note are the iterations and key length params being passed in, t
 
 I'm using "PBEWITHSHA256AND256BITAES-CBC-BC" to create the key and its worth noting what that very long String is all about. It's really just a long concatenated set of Algo specifications.  PBEWITHSHA256 is saying password based encryption using Sha256. Additionally I'm adding 256 AES just to be extra secure and CBC and BC refer to using Block Cypher which means that the encryption is done in distinct blocks. This becomes somewhat relevant when discussing Initialization Vectors which come up later when encrypting the actual file. 
 
-All done! you have taken your "MyS3cr3tPassword" and turned it into something that looks more like this: 
+All done! you have taken your "MyS3cr3tPassword" and turned it into something that looks more like this: ```[-49, -25, -2, 112, 35, -60, -36, -89, 90, 1, -85, -117, -65, -16, -125, -5, 42, -115, 1, 116, 108, 126, 16, 2, -16, 82, -37, -30, -17, 83, -16, -82]```
+
+## Encrypting The File
+
+Finally got the Key generation out of the way now for the fun part, turning your file into a bunch of gibberish! Lets look at the encrypt method.
+
+```
+    def encodeStream(InputStream inputStream, OutputStream streamOut) throws GeneralSecurityException{
+        byte[] ivData = new byte[AES_NIVBITS/8] //[1]
+        new SecureRandom().nextBytes(ivData)
+
+        //Select encrypt algo and padding: AES with CBC and PCKS7
+        //Encrypt input stream using key+iv
+        KeyParameter keyParam = getAesKey(this.password) //[2]
+        CipherParameters params = new ParametersWithIV(keyParam, ivData)
+
+        BlockCipherPadding padding = new PKCS7Padding()
+        BufferedBlockCipher blockCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), padding) // [3]
+        blockCipher.reset()
+        blockCipher.init(true, params)
+
+        streamOut.write(ivData)
+        CipherOutputStream cipherOut = new CipherOutputStream(streamOut, blockCipher) //[4]
+        IOUtils.copy(inputStream, cipherOut) //[5]
+        cipherOut.close()
+    }
+```
+
+This is where the fun happens, note that this method takes an ```InputStream``` and returns an ```OutputStream``` containing the encrypted data. The reason for this is to allow the management of the content to be managed apart from the encryption. Perhaps your not even reading a file but a URL?
+
+Let's walk through the encryption [1] Initializing an Initialization Vector, this is generated from the SecureRandom object and is used to initiate the block cipher. The IV should be unique and never reused. Also this is a public value that will be pre-pended to the output stream and used to decrypt later on.
+
+[2] Here we are just grabbing the encrypted password mentioned earlier and adding them to the CipherParamaters that help  Bouncy Castle encryption figure out what to do.  
+
+[3] Time to set up the BlockCipher, her we are specifying PKCS7 Padding and AES. Of interest is the BufferedBlockCipher which allows buffering in the encryption so your not trying to encrypt the full file at once, this is pretty important when your attempting to encrypt large files! One reason I picked CBC encryption was that prior Algos using GCS couldn't manage files over 64mb, ouch.
+
+[4][5] these 2 lines make it happen, CipherOutputStream allows you to encrypt  a stream and isnt something you'll see in most examples which simply encrypt a short String. Finally Apache project helps us again with a handy commons-io Stream copy util. Don't copy the streams yourself, let Apache do it, trust me. 
+
+## De-crypting The File
+
+OK got it encrypted! Not to turn that gibberish back into something useful!
+
+```
+def decryptStream(InputStream encStream, OutputStream unEcnOutStream){
+        //Extract the IV, which si stored in the next N bytes at the start of fileStream.
+        int nIvBytes = AES_NIVBITS/ 8 as int
+        byte[] ivBytes = new byte[nIvBytes]
+        encStream.read(ivBytes, 0, nIvBytes) // [1]
+
+        KeyParameter keyParam = getAesKey(this.password)
+        CipherParameters params = new ParametersWithIV(keyParam, ivBytes)
+        BlockCipherPadding padding = new PKCS7Padding()
+        BufferedBlockCipher blockCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), padding)
+        blockCipher.reset()
+        blockCipher.init(false, params) [2]
+
+        CipherInputStream cipherIn = new CipherInputStream(encStream, blockCipher) [3]
+        IOUtils.copy(cipherIn, unEcnOutStream) 
+        cipherIn.close()
+    }
+```
+
+Not surprisingly, Decrypting the file is pretty much reversing what the encrypting did, as mentioned [1] we grab that unencrypted IV value and read it from the stream so we can reinitialize everything. [2] Set up our Buffered Cipher. NOTE: init(false, params) the false indicates decrypt mode, true is encrypt. It's not a very obvious detail and can trip you up if you miss it.  Set up [3] our CipherInputStream to decrypt the stream and Apache copies it into the OutputStream! Funny how similar and simple reversing the code is!
+
+
+
+## Summary and Tests
+
+To tie this all together, I wrote a Spock test to provide an example and better demonstrate usage, the full test code is in the file [EncryptionUtilSpec](/./src/test/groovy/org/meadowhawk/util/crypto/EncryptionUtilSpec.groovyEncryptionUtilSpec.groovy) but here's the highlights.
+
+```
+    def "Test encrypting a File" () {
+        given:
+        EncryptionUtil encryptionUtil = new EncryptionUtil(password)
+        File inFile = new File('./src/test/resources/starWarsIpsum.txt')
+        def unEncLine
+        inFile.withReader { unEncLine = it.readLine() }
+
+        InputStream inStr = inFile.newInputStream()
+        FileOutputStream fileOutputStream = new FileOutputStream(encOutFie)
+
+        when:
+        fileOutputStream.with {fileStream ->
+            encryptionUtil.encodeStream(inStr, fileStream)
+        }
+
+        then:
+        File encOutFile = new File(encOutFie)
+        encOutFile.exists()
+
+        assert !encOutFile.text .contains(unEncLine)
+
+        when:
+        String decInput = ""
+        FileOutputStream decFileOutStream = new FileOutputStream(decryptFileName)
+
+        InputStream encInStr = encOutFile.newInputStream()
+        encryptionUtil.decryptStream(encInStr, decFileOutStream)
+        decFileOutStream.flush()
+        decFileOutStream.close()
+        encInStr.close()
+
+        then:
+        File decFile = new File(decryptFileName)
+        assert decFile.exists()
+        assert decFile.text .contains(unEncLine)
+    }
+
+```
+
+The test reads the unencrypted Start Wars Ipsum file, encrypts it to a file and then reads the encrypted file  and outputs an unencrypted copy of the original. Magic math!
+
+Hope this helps someone out in their own project!

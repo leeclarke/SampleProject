@@ -87,7 +87,7 @@ class EncryptionUtil {
         BlockCipherPadding padding = new PKCS7Padding()
         BufferedBlockCipher blockCipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), padding)
         blockCipher.reset()
-        blockCipher.init(true, params)
+        blockCipher.init(false, params)
 
         CipherInputStream cipherIn = new CipherInputStream(encStream, blockCipher)
         IOUtils.copy(cipherIn, unEcnOutStream)

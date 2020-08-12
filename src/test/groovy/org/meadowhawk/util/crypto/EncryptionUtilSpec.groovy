@@ -7,8 +7,8 @@ import java.security.SecureRandom
 
 class EncryptionUtilSpec extends Specification{
     String password = "1tzaS3cr3t!"
-    String encOutFie = './src/test/resources/text.enc'
-    String decryptFileName = 'test.txt'
+    String encOutFie = './src/test/resources/starWarsIpsum.enc'
+    String decryptFileName = 'starWarsIpsum.txt'
 
     def "Test password encryption using one way hash" () {
         given:
@@ -28,20 +28,23 @@ class EncryptionUtilSpec extends Specification{
     def "Test encrypting a File" () {
         given:
         EncryptionUtil encryptionUtil = new EncryptionUtil(password)
-        File inFile = new File('./src/test/resources/test.txt')
+        File inFile = new File('./src/test/resources/starWarsIpsum.txt')
+        def unEncLine
+        inFile.withReader { unEncLine = it.readLine() }
 
         InputStream inStr = inFile.newInputStream()
         FileOutputStream fileOutputStream = new FileOutputStream(encOutFie)
 
         when:
         fileOutputStream.with {fileStream ->
-            encryptionUtil.encodeStream(inStr, fileStream) //TODO Figure out how salt isnt being set
+            encryptionUtil.encodeStream(inStr, fileStream)
         }
 
         then:
         File encOutFile = new File(encOutFie)
         encOutFile.exists()
-        //TODO: Check that the input text isnt in the file
+
+        assert !encOutFile.text .contains(unEncLine)
 
         when:
         String decInput = ""
@@ -56,6 +59,6 @@ class EncryptionUtilSpec extends Specification{
         then:
         File decFile = new File(decryptFileName)
         assert decFile.exists()
-
+        assert decFile.text .contains(unEncLine)
     }
 }
